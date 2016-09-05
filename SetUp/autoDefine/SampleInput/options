@@ -1,0 +1,17 @@
+$coord file=init_coord
+$dft  func=tpss grid=6
+$ignored
+$frag frag1=1,2,3-50 frag2=51-55,57,56,58-60 \
+      chrg1=2 chrg2=-2
+$title Madea goes to jail
+$ri mem=1000 
+  file=whyDoThis
+  jbas=def2-TZVP
+$cc freeze=num=6
+cbas=def2-SVP
+cfail
+denconv=4.632d-7
+$sym sym=auto eps=1d-6
+$internal off
+$eht modWH=off 1,4=1.90  1,7=1.50
+$end
