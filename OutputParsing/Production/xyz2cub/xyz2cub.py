@@ -17,6 +17,7 @@ import argparse
 #          increment must be marked by a newline. The output file will 
 #          be the input xyz file's basename followed by .cub
 def xyz2cub (xyzname,coord):
+    xyzname=xyzname[0]
     xyz_end=re.compile('\.[xX][yY][zZ]$')
 
     #coord file must be in the current directory
@@ -159,7 +160,7 @@ def printCubVals(xyz,cub,atNum):
                 loc = entry[0:3]
                 vstep = entry[3]
 
-                #Counts the number of times 2-increments itself using the 
+                #Counts the number of times 2 increments itself using the 
                 #fact there is always a blank line in the file before it happens 
                 if not ( 'x3inc' in locals() or 'x3inc' in globals() ) and \
                         cycleFin :
@@ -196,6 +197,7 @@ def printCubVals(xyz,cub,atNum):
                      not ( isClose(loc[0]-lastLoc[0],x2inc,1e-5,0) and \
                            isClose(loc[1]-lastLoc[1],y2inc,1e-5,0) and \
                            isClose(loc[2]-lastLoc[2],z2inc,1e-5,0) ):
+
                     x3inc=loc[0] - origin[0]
                     y3inc=loc[1] - origin[1]
                     z3inc=loc[2] - origin[2]
@@ -251,6 +253,10 @@ def printCubVals(xyz,cub,atNum):
     p.wait()
 
 
+#            In testing this code .xyz files have been found that do not increment xyz in the 
+#            correct order. If the dimensions of the .cub file are incorrect check if this is 
+#            the case. If not, the next most likely points of failure are lack of a new line
+#            ending the file and the rel_tol variable for the isClose calls being a bad size. 
 
 if __name__ == '__main__' :
     parser = argparse.ArgumentParser(description='This program takes as input a Turbomole xyz '+ 
@@ -261,7 +267,7 @@ if __name__ == '__main__' :
             'are. It relies on the fact values start at the gridpoint with the smallest '      +
             'possible coordinates and the file iterates along x, y, z, in that order. Each '   +
             'y/z increment must be marked by a newline. The output file will be the input xyz '+
-            "file's basename followed by .cub")
+            "file's basename followed by .cub\n")
 
     parser.add_argument('xyzName',nargs=1, help='The name of the .xyz file that needs to be '+
                         'converted.')
