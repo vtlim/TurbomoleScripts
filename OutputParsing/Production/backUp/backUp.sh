@@ -7,7 +7,16 @@ USAGE: $0 [-h] DIRECTORIES and/or FILES
 The purpose of this script is to back up whatever files are given to
 it as argument. These files may be on local or remote servers. 
 
-The script starts by rsyncing all files specified in ~/.cron_backup
+This script works best in conjunction with the cron task scheduler. 
+Simply create a textfile containing the full file pathnames (preceded
+by the hostname if file is on a remote server) of whatever needs 
+to be backed up. Then schedule a cron job that calls this script
+with an argument of \$(cat filename).
+
+The script is written such that filename expansion may be
+used to specify many files at once ( *, {...}, etc.)
+
+The script starts by rsyncing all files given to it as argument to BACKUP. 
 It then checks to see if the file matches any other versions contained
 in the ARCHIVE folder. If it does not, the script puts a copy of the 
 file in ARCHIVE with the date that file was last modified as extension. 
