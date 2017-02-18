@@ -44,7 +44,7 @@ def getAtomWeight( atom ):
       return dict[atom]
 
    except KeyError:
-      print "'" + atom + "' isn't in the dictionary yet. Why not add it?\n"
+      print("'" + atom + "' isn't in the dictionary yet. Why not add it?\n")
       raise
 
 
@@ -66,7 +66,7 @@ def makeInertiaTensor( xyz_at ):
          if(len(xyz_at) == 0):
             raise TypeError(xyz_at)
       except TypeError:
-         print 'Error: empty list passed to makeInertiaTensor, check your coord file'
+         print('Error: empty list passed to makeInertiaTensor, check your coord file')
          raise
 
 
@@ -88,7 +88,7 @@ def makeInertiaTensor( xyz_at ):
          totWeight += atWeight
         
          del entry[3]
-         entry = map(float, entry)
+         entry = list(map(float, entry))
 
          ixx += (entry[1]**2 + entry[2]**2)*atWeight
          ixy -= (entry[0]*entry[1])*atWeight
@@ -121,11 +121,11 @@ def makeInertiaTensor( xyz_at ):
       return iTens
 
    except TypeError:
-      print 'List must be 2-D\n'
+      print('List must be 2-D\n')
       raise
 
    except IndexError:
-      print 'Every list entry must have format [x,y,z,at]\n'
+      print('Every list entry must have format [x,y,z,at]\n')
       raise
 
 
@@ -186,5 +186,5 @@ if __name__ == '__main__':
 
       rots = getRotConst(coord)
 
-      print file + ' - A: ', rots[0], ' MHz , B: ', rots[1],                   \
-            ' MHz , C: ', rots[2], ' MHz\n'
+      print(file + ' - A: ', rots[0], ' MHz , B: ', rots[1], 
+            ' MHz , C: ', rots[2], ' MHz\n')
