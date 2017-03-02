@@ -33,13 +33,18 @@ from __future__ import division, print_function
 
 import numpy as np
 import math
-import elements
 import argparse
+import sys
 import collections
 
 from scipy.spatial import ConvexHull
 from scipy.special import expit
 from scipy.optimize import minimize
+
+# Non-standard libraries
+#import elements
+import rdkit.Chem.AllChem as Chem
+import pybel # From OpenBabel
 
 
 try:
@@ -49,87 +54,189 @@ except ImportError:
     pass
 
 
-class Fragment(object):
-    def __init__(self,coord_file,f_type):
-        self.precision = 1e-5
 
-        # store coordinates and labels in array
-        self.file_name = coord_file
-        coords = open(self.file_name,'r')
-        self.read(coords,f_type)
-
-        # Find the point other fragments will connect to this one
-        print(self.at_labels)
-        connect = np.where(self.at_labels == 'X')
-        try:
-            assert len(connect[0]) == 1
-        except AssertionError:
-            print('Error: Fragment file ' + coord_file + ' must have ONE '
-                 + "entry with label 'x' specifying the connection point")
-            raise
-        print(connect[0],len(connect))
-        self.connect = self.coord[connect[0][0]]
-        self.coord = np.delete(self.coord,connect[0][0],axis=0)
-        self.at_labels = np.delete(self.at_labels,connect[0][0],axis=0)
+class Writer(object):
+    def __init__(self,coord,at_labels):
+        # shallow copy allows tracking of in-place modification
+        # of coordinates and labels. Consider if this wanted
+        self.coord = coord
+        self.at_labels = at_labels
 
 
-        # Need to have some atoms
-        try:
-            assert len(self.coord) != 0
-        except AssertionError:
-            print('Error: No coordinates found in '+coord_file)
-            raise
-
-        # Orient molecule in a convenient way
-        self.orient_frag()
-
-        # Only convex hull will be used when optimizing
-        # to final orientation
-        self.hull, self.hull_ats = self.build_hull()
-
-
-    def __len__(self):
-        """Returns number of elements in convex hull of molecule"""
-        return len(self.hull)
-
-
-    def __str__(self):
+    def write(self,outfile,f_type,header=True):
         """
-        Returns name of the file this fragment got its coordinates from
-        """
-        return self.file_name
+        Write coordinates to outfile with format f_type. If header is true,
+        headers and footers for the file type will be written. Otherwise
+        only coordinates will be written. If header True and outfile not
+        opened, an appropriate file extension will be added if not present.
 
-    
-    def read(self,coords,f_type):
+        Input: outfile - String with name of file or opened writable file
+               f_type  - String specifying file type        
+
+        Output: coord_array - numpy array of atomic coordinates (atoms x 3)
+                at_array - numpy array of atomic coordinates (atoms x 3)
+        """
         try:
-            if f_type == 'Turbomole':
-                self.coord, self.at_labels = self.read_coord(coords)
-            elif f_type == 'xyz':
-                self.coord, self.at_labels = self.read_xyz(coords)
+            outfile.name
+        except AttributeError:
+            if header:
+                outfile = self._add_extension(outfile,f_type)
+            outfile = open(outfile,'w')
+
+        try:
+            if f_type == 'xyz':
+                self._write_xyz(outfile,header)
+            elif f_type == 'tmol':
+                self._write_coord(outfile,header)
             else:
                 raise NotImplemented
         except NotImplemented:
-            print('Error: File ' + self.file_name + ' of file type ' + f_type 
-                 +' could not be read. That file type not yet readable by the '
-                 +'Fragment class.')
+            print('Error: File type: ' + f_type + ', is not yet implemented '
+                 +'for writing.')
             raise
 
-    def read_coord(self,coords):
+
+    def _add_extension(self,outfile,f_type):
         """
-        Read a Turbomole format coord file, storing the atomic coordinates 
+        Add the appropriate file extension to output file name if 
+        it doesn't already have one
+
+        Input: outfile - String with name of output file
+               f_type  - String specifying file type
+
+        Output: outfile - Modified file name
+        """
+        if f_type == 'xyz':
+            if outfile.find('.xyz') == -1:
+                outfile += '.xyz'
+        elif f_type == 'tmol':
+            if outfile.find('coord') == -1:
+                outfile += '.coord'
+        return outfile
+
+
+    def _write_coord(self,outfile,header=True):
+        """
+        Write coordinates to Turbomole format coord file. Assumes coordinates
+        are in Angstroms. 
+
+        Input: outfile - Opened, writable file
+               header  - If False only write coordinates to file, otherwise
+                         include header and footer info as well
+        """
+        ang_2_bohr = 1.889725989 # Need to convert back to bohr
+
+        if header:
+            outfile.write('$coord\n')
+        for coords,label in zip(self.coord,self.at_labels):
+            outfile.write(('{:20.14f}  '*3 + '{:>5s}\n').format(
+                          coords[0]*ang_2_bohr,
+                          coords[1]*ang_2_bohr,
+                          coords[2]*ang_2_bohr,
+                          label.lower()))
+        if header:
+            outfile.write('$end')
+
+
+    def _write_xyz(self,outfile,header=True):
+        """
+        Write coordinates to xyz format coord file. Assumes coordinates
+        are in Angstroms. 
+
+        Input: outfile - Opened, writable file
+               header  - If False only write coordinates to file, otherwise
+                         include header and footer info as well
+        """
+        n = len(self.coord)
+        if header:
+            outfile.write(str(n)+'\n\n')
+
+        count = 1
+        for coords,label in zip(self.coord,self.at_labels):
+            outfile.write(('{:4s}'+'{:15.9f} '*3).format(
+                          label.upper(),coords[0],coords[1],coords[2]))
+            if count != n:
+                outfile.write('\n')
+            count += 1
+
+
+
+# Consider overriding __setattr__ for some attributes here
+class Reader(object):
+    def __init__(self,coords,f_type=''):
+        """
+        Read a coord file of specified type, store the atomic coordinates 
+        and capitalized atomic labels in numpy arrays. Will attempt 
+        to automatically identify file type if not supplied. 
+    
+        Input: coords - String with name of coord file or opened readable 
+                        coord file
+               f_type - String specifying file type, if left blank type 
+                        determined from file name
+        """
+        # File should have name attribute, if coords doesn't it's likely string
+        try:
+            self.name = coords.name
+        except AttributeError:
+            coords = open(coords,'r')
+            self.name = coords.name
+
+        if f_type == '':
+            f_type = self._determine_file_type()
+        self.f_type = f_type
+
+        try:
+            if f_type == 'tmol':
+                self.coord, self.at_labels = self._read_coord(coords)
+            elif f_type == 'xyz':
+                self.coord, self.at_labels = self._read_xyz(coords)
+            else:
+                raise NotImplemented
+        except NotImplemented:
+            print('Error: File ' + self.name + ' of file type ' + self.f_type 
+                 +' could not be read. That file type not yet readable by the '
+                 +'Reader class.')
+            raise
+
+
+    def __str__(self):
+        """Return name of file read"""
+        return self.name
+
+
+    def _determine_file_type(self):
+        """Attempts to automatically determine file type from file name"""
+        try:
+            if self.name.lower().find('coord') != -1:
+                file_t = 'tmol'
+            elif self.name.lower().find('.xyz') != -1:
+                file_t = 'xyz'
+            else:
+                raise TypeError
+        except TypeError:
+            print('Error: could not determine file type of '
+                 + self.name + '\nPlease specify.')
+            raise
+    
+        return file_t
+
+
+    def _read_coord(self,coords):
+        """
+        Read a tmol format coord file, storing the atomic coordinates 
         and atomic labels in a numpy array.
     
-        Input: coords - opened Turbomole format coord file
+        Input: coords - opened tmol format coord file
         
         Output: coord_array - numpy array of atomic coordinates (atoms x 3)
                 at_array - numpy array of atomic coordinates (atoms x 3)
         """
         bohr_2_ang = 0.52917724900001 # We want our units in Angstroms
-        # We want only the atomic label, this will be at most two characters
-        # long. 
+
+        # atom labels at most 5 characters supported
         at_array = np.array([],dtype='S5')
         coord_array = np.array([])
-    
+
         started = False
         for line in coords:
             if line.find('$coord') != -1:
@@ -148,7 +255,7 @@ class Fragment(object):
         return coord_array, at_array
     
     
-    def read_xyz(self,coords):
+    def _read_xyz(self,coords):
         """
         Read a .xyz format coord file, storing the atomic coordinates 
         and atomic labels in a numpy array.
@@ -179,56 +286,87 @@ class Fragment(object):
     
         return coord_array, at_array
 
+
     
-    def write(self,outfile,out_t,header=True):
+class Fragment(object):
+    def __init__(self,coord_file,f_type):
+        self.precision = 1e-5
+
+        # store coordinates and labels in array
+        self.read(coord_file,f_type)
+
+        # Find the point other fragments will connect to this one
+        connect = np.where(self.at_labels == 'X')
         try:
-            if out_t == 'xyz':
-                self._write_xyz(outfile,header)
-            elif out_t == 'Turbomole':
-                self._write_coord(outfile,header)
-            else:
-                raise NotImplemented
-        except NotImplemented:
-            print('Error: File type ' + out_t + ' is not yet implemented '
-                 +'for writing.')
+            assert len(connect[0]) == 1
+        except AssertionError:
+            print('Error: Fragment file ' + coord_file + ' must have ONE '
+                 + "entry with label 'x' specifying the connection point")
+            raise
+        print(connect[0],len(connect))
+        self.connect = self.coord[connect[0][0]]
+        self.coord = np.delete(self.coord,connect[0][0],axis=0)
+        self.at_labels = np.delete(self.at_labels,connect[0][0],axis=0)
+
+
+        # Need to have some atoms
+        try:
+            assert len(self.coord) != 0
+        except AssertionError:
+            print('Error: No coordinates found in '+coord_file)
             raise
 
+        # Orient molecule in a convenient way
+        self.orient_frag()
 
-    def _write_coord(self,outfile,header=True):
+        # Convex hull can be used to check if molecules collide after 
+        # joining fragments. It may also be sufficient for optimizing
+        # the union of two fragments. for now we use full molecule. 
+        self.set_hull()
+        #self.hull, self.hull_ats = self.build_hull()
+
+
+    def __len__(self):
+        """Returns number of elements in convex hull of molecule"""
+        return len(self.hull)
+
+
+    def __str__(self):
         """
-        outfile should be an opened file for writing
+        Returns name of the file this fragment got its coordinates from
         """
-        ang_2_bohr = 1.889725989 # Need to convert back to bohr
+        return self.name
 
-        if header:
-            outfile.write('$coord\n')
-        for coords,label in zip(self.coord,self.at_labels):
-            outfile.write(('{:20.14f}  '*3 + '{:>5s}\n').format(
-                          coords[0],coords[1],coords[2],label.lower()))
-        if header:
-            outfile.write('$end')
-
-
-    def _write_xyz(self,outfile,header=True):
+    
+    def read(self,coords,f_type=''):
         """
-        outfile should be an opened file for writing
+        Read in entries from file coords of file type f_type and 
+        store the coordinates and atomic labels
+
+        Input: coords - String with name of coord file or opened readable 
+                        coord file
+               f_type - String specifying file type, if left blank type 
+                        determined from file name
         """
-        n = len(self.coord)
-        if header:
-            outfile.write(str(n)+'\n\n')
-
-        count = 1
-        for coords,label in zip(self.coord,self.at_labels):
-            outfile.write(('{:4s}'+'{:15.9f} '*3).format(
-                          label.upper(),coords[0],coords[1],coords[2]))
-            if count != n:
-                outfile.write('\n')
-            count += 1
+        reader = Reader(coords,f_type)
+        self.coord, self.at_labels = reader.coord, reader.at_labels
+        self.name = reader.name
 
 
+    def write(self,outfile,f_type):
+        """
+        Write coordinates to file outfile with format f_type.
+
+        Input: outfile - String with name file or opened writable file
+               f_type - String specifying file type
+        """
+        writer = Writer(self.coords,self.at_labels)
+        writer.write(outfile,f_type)
+
+    
     # This routine based on one found in: 
     # http://stackoverflow.com/questions/6802577/python-rotation-of-3d-vector
-    def rotate_frag(self,rots,hull=False):
+    def rotate_frag(self,rots):
         """
         Return the fragment coordinates rotated counterclockwise about 
         a rotation axis, with both degree rotated and axis direction 
@@ -243,10 +381,8 @@ class Fragment(object):
         r_mat = np.array([[aa+bb-cc-dd, 2*(bc+ad), 2*(bd-ac)],
                           [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
                           [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
-        if hull:
-            return np.dot(self.hull,r_mat.T)
-        else:
-            return np.dot(self.coord,r_mat.T), np.dot(self.connect,r_mat.T)
+
+        return np.dot(self.coord,r_mat.T), np.dot(self.connect,r_mat.T)
 
     
     def rotate(self,rots):
@@ -284,6 +420,14 @@ class Fragment(object):
         self.rotate(rots)
         dr_fil = open('rotaft.xyz','w')
 
+
+    def set_hull(self):
+        """
+        Calculates the convex hull of the fragment and assigns it to 
+        the hull and hull_ats attributes of the fragment. 
+        """
+        self.hull = np.copy(self.coord)
+        self.hull_ats = np.copy(self.at_labels)
 
     # For now we build the entire hull. If performance matters we 
     # can improve this routine by building only partial hulls
@@ -360,6 +504,9 @@ class Fragment(object):
         rot.shift_origin(np.array([0,0,-dist]))
         anchor.shift_origin(anchor.connect)
 
+        rot.set_hull()
+        anchor.set_hull()
+
 #        dr_fil = open('origrotaft.xyz','w')
 #        rot.write(dr_fil,'xyz')
 #        dr_fil = open('origanchaft.xyz','w')
@@ -371,7 +518,6 @@ class Fragment(object):
 #        self.write(dr_fil,'xyz',header=False)
 #        dr_fil.write('\n')
 #        anchor.write(dr_fil,'xyz',header=False)
-
 
             
 
@@ -531,7 +677,7 @@ class ForceField(object):
 # May want to rewrite to take VDW radii into account with cut
 def calc_dists(s_frag,f_frag,cut=3.0):
     """
-    Calculate non-negligible dists and return them and with a tuple
+    Calculate non-negligible dists and return them as part of a tuple
     storing the atom labels of the corresponding elements.
     """
     # We allocate the max number of elements possible 
@@ -560,14 +706,14 @@ def calc_dists(s_frag,f_frag,cut=3.0):
 def score_rotation(rots,s_frag,f_frag,f_field):
     """
     Calculates the value of the objective function (energy) for this
-    optimization. This objective function uses stored partial charge
-    and VDW radii to calculate an energy value. 
+    optimization. This objective function uses a force field to 
+    calculate the energy of the molecule contained within. 
     """
     # I use unconstrained variables and map them to [0,1] 
     # with expit (the logistic function) when optimizing. The hope 
     # is that this will be faster. Need to verify.
     norm_rots = expit(rots)
-    s_frag.guess_hull = s_frag.rotate_frag(norm_rots,hull=True)
+    s_frag.hull, dum = s_frag.rotate_frag(norm_rots)
 
     dists, labels = calc_dists(s_frag,f_frag)
 
@@ -579,28 +725,15 @@ def score_rotation(rots,s_frag,f_frag,f_field):
     return score
 
 
-def determine_file_type(file_name):
-    try:
-        if file_name.find('coord') != -1:
-            file_t = 'Turbomole'
-        elif file_name.find('.xyz') != -1:
-            file_t = 'xyz'
-        else:
-            raise TypeError
-    except TypeError:
-        print('Error: could not determine file type of '
-             + file_name + '\nPlease specify.')
-        raise
-
-    return file_t
-
+#def minimize(
 
 def add_ligand(file1,file2,dist,file_t1='',file_t2='',out='combo',out_t='xyz'):
-    if file_t1 == '':
-        file_t1 = determine_file_type(file1)
-    if file_t2 == '':
-        file_t2 = determine_file_type(file2)
-
+    """
+    Combines the molecules specified in file1 and file2 together by combining 
+    them while keeping the point specified by an 'x' in each file dist 
+    Angstroms apart. 
+    """
+    py3 = (sys.version_info[0] > 3)
     frag1 = Fragment(file1,file_t1)
     frag2 = Fragment(file2,file_t2)
     if len(frag1) <= len(frag2):
@@ -608,6 +741,15 @@ def add_ligand(file1,file2,dist,file_t1='',file_t2='',out='combo',out_t='xyz'):
     else:
         s_frag, f_frag = frag2, frag1
     f_frag.align_frags(s_frag, dist)
+
+    tmp = Writer(np.append(s_frag.hull,f_frag.coord),
+                 np.append(s_frag.at_labels,f_frag.at_labels))
+    tmp.write(out,out_t)
+
+    # We use the Python 3 syntax here
+    sup_mol = pybel.readfile(out_t,out)
+    sup_mol = next(sup_mol)
+    
 
 
     f_field = ForceField('MMFF94')
@@ -628,31 +770,36 @@ def add_ligand(file1,file2,dist,file_t1='',file_t2='',out='combo',out_t='xyz'):
     s_frag.rotate(expit(opt.x))
     print('aft',s_frag.coord)
 
-    try:
-        if out_t == 'xyz':
-            if out.find('.xyz') == -1:
-                out += '.xyz'
-            outfile = open(out,'w')
-            outfile.write(str(len(s_frag.coord)+len(f_frag.coord)) + '\n\n')
-        elif out_t == 'Turbomole':
-            if out.find('coord') == -1:
-                out += '.coord'
-            outfile = open(out,'w')
-            outfile.write('$coord\n')
-        else:
-            raise TypeError
-    except TypeError:
-        print('Error: Output file type ' + out_t + ' not implemented yet.')
-        raise
-
-    s_frag.write(outfile,out_t,header=False)
-    if out_t == 'xyz':
-        outfile.write('\n')
-    f_frag.write(outfile,out_t,header=False)
-    if out_t == 'Turbomole':
-        outfile.write('$end')
-
+    fin = Writer(np.append(s_frag.coord,f_frag.coord),
+                 np.append(s_frag.at_labels,f_frag.at_labels))
+    fin.write(out,out_t)
     print('Molecules joined succesfully')
+
+#    try:
+#        if out_t == 'xyz':
+#            if out.find('.xyz') == -1:
+#                out += '.xyz'
+#            outfile = open(out,'w')
+#            outfile.write(str(len(s_frag.coord)+len(f_frag.coord)) + '\n\n')
+#        elif out_t == 'tmol':
+#            if out.find('coord') == -1:
+#                out += '.coord'
+#            outfile = open(out,'w')
+#            outfile.write('$coord\n')
+#        else:
+#            raise TypeError
+#    except TypeError:
+#        print('Error: Output file type ' + out_t + ' not implemented yet.')
+#        raise
+#
+#    s_frag.write(outfile,out_t,header=False)
+#    if out_t == 'xyz':
+#        outfile.write('\n')
+#    f_frag.write(outfile,out_t,header=False)
+#    if out_t == 'tmol':
+#        outfile.write('$end')
+#
+#    print('Molecules joined succesfully')
 
 
 if __name__ == '__main__':
@@ -674,15 +821,15 @@ if __name__ == '__main__':
 
     parser.add_argument('-t1','--type1', default='',
             help='Format for file1. Possibilities are "xyz" and '
-                +'"Turbomole" (Default: automatically determined)')
+                +'"tmol" (Default: automatically determined)')
     parser.add_argument('-t2','--type2', default='',
             help='Format for file2. Possibilities are "xyz" and '
-                +'"Turbomole" (Default: automatically determined)')
+                +'"tmol" (Default: automatically determined)')
     parser.add_argument('-o','--outfile', default='combo',
             help='Filename for output molecule (Default: combo)')
     parser.add_argument('-to','--type_out', default='xyz',
             help='Format for output. Possibilities are "xyz" and '
-                +'"Turbomole" (Default: xyz)')
+                +'"tmol" (Default: xyz)')
 
     args = parser.parse_args()
 
