@@ -364,7 +364,7 @@ class Fragment(object):
         writer.write(outfile,f_type)
 
     
-    # This routine based on one found in: 
+    # This function based on one found in: 
     # http://stackoverflow.com/questions/6802577/python-rotation-of-3d-vector
     def rotate_frag(self,rots):
         """
@@ -408,17 +408,19 @@ class Fragment(object):
         self.shift_origin(cov)
 
         z = np.array([0,0,1])
-        con_mag = np.dot(self.connect,self.connect)
+        con_mag = math.sqrt(np.dot(self.connect,self.connect))
         if con_mag < self.precision:
             return
 
         # note math.sqrt is faster for scalars than np.sqrt
         # We use the half-angle formula to get sin(\phi/2)
+        # Sign of the cross product dictates orientation of rotation
         sin_rot = math.sqrt((1-np.dot(self.connect,z)/con_mag)/2)
-        rots = np.cross(z,self.connect)/con_mag
+        rots = -np.cross(self.connect,z)
+        rots /= math.sqrt(np.dot(rots,rots))
         rots *= sin_rot
+
         self.rotate(rots)
-        dr_fil = open('rotaft.xyz','w')
 
 
     def set_hull(self):
