@@ -336,13 +336,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for setting up Turbomole'
            + ' calculations. Takes as argument a list of directories containing'
            + ' coord files. Will delete any control file already present, and run'
-           + ' define based on options specified in options file and through'
-           + ' name. See the script for more information.' )
+           + ' define based on options specified in the global options'
+           + ' file (called ./options or specified with option -o), through' 
+           + ' the directory name (see script), or through the local options'
+           + ' file (called options and located in the argument directory).')
     parser.add_argument('dirs',nargs='*',default='.', help='The directories'
            + ' containing the coord files to be used with define.'
            + ' (ex: dir1 dir2 ...) (Default: current directory) ')
     parser.add_argument('-o','--options', default='options',help='Allows the'
-           + ' user to specify the path to the options file.'
+           + ' user to specify the path to the global options file.'
            + ' (ex: -o global_options) (Default: ./options)')
     parser.add_argument('-k','--keep_going', action='store_true',
             help='Continue iterating through directories even if define fails.')
