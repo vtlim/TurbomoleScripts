@@ -332,19 +332,18 @@ def inputBuilder( directories, options, keep_going ):
                 sys.exit()
 
 
-
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Tool for setting up Turbomole' +
-            ' calculations. Takes as argument a list of directories containing '+
-            'coord files. Will delete any control file already present, and run' +
-            ' define based on options specified in options file and through '+
-            'name. See the script for more information.' )
-    parser.add_argument('dirs',nargs='*',default='.', help='The directories containing the coord'+
-            ' files to be used with define (Default: current directory).')
-
-    parser.add_argument('-o','--options', default='options',help='Allows the user to '+
-            'specify the path to the options file. (Default: ./options)')
+    parser = argparse.ArgumentParser(description='Tool for setting up Turbomole'
+           + ' calculations. Takes as argument a list of directories containing'
+           + ' coord files. Will delete any control file already present, and run'
+           + ' define based on options specified in options file and through'
+           + ' name. See the script for more information.' )
+    parser.add_argument('dirs',nargs='*',default='.', help='The directories'
+           + ' containing the coord files to be used with define.'
+           + ' (ex: dir1 dir2 ...) (Default: current directory) ')
+    parser.add_argument('-o','--options', default='options',help='Allows the'
+           + ' user to specify the path to the options file.'
+           + ' (ex: -o global_options) (Default: ./options)')
     parser.add_argument('-k','--keep_going', action='store_true',
             help='Continue iterating through directories even if define fails.')
     args = parser.parse_args()

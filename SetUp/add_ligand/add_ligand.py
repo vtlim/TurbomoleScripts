@@ -417,6 +417,10 @@ class Fragment(object):
         # Sign of the cross product dictates orientation of rotation
         sin_rot = math.sqrt((1-np.dot(self.connect,z)/con_mag)/2)
         rots = -np.cross(self.connect,z)
+        
+        # Make sure connect isn't already aligned
+        if np.dot(rots,rots) < self.precision
+            return
         rots /= math.sqrt(np.dot(rots,rots))
         rots *= sin_rot
 
