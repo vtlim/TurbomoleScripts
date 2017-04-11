@@ -1,5 +1,6 @@
 import sys
 import re
+import subprocess as sp
 
 
 
@@ -718,7 +719,6 @@ def rirpa(botSpecs, entries, defInp):
          defInp.write('rpaprof\n')
 
       defInp.write('\n')
-      
 
 
 
@@ -755,3 +755,45 @@ def scf(botSpecs, entries, defInp):
 
 
       defInp.write('\n')
+
+################################################################################
+#                             Begin Post Processing                            #
+################################################################################
+
+
+
+#dsp() handles dispersion related specifications. Define
+#      could not print these options until V7-2 so we add
+#      them directly to the control file. 
+#
+#Default: Not used
+#
+#KeyFormat: $dsp  [d3,d3bj,d2]
+def dsp(botSpecs, entries, keep_going):
+   key='$dsp'
+
+   dsp=getLine(entries, key)
+   dspBot=getLine(botSpecs, key)
+
+   if dspBot:
+      dsp = dspBot
+
+   if dsp:
+      #New disp keys go here
+      disp_dict = {'d3'   : '$disp3',
+                   'd3bj' : '$disp3 bj',
+                   'd2'   : '$disp'}
+      dsp = dsp.strip()
+      try:
+         #Consider looking for a solution not using Popen
+         p=sp.Popen("sed -i 's/$end/" + disp_dict[dsp] 
+                  + "\\n$end/' control",shell=True)
+         p.wait()
+      except KeyError:
+         print 'Error: ' + dsp + ' is not an allowed entry for $dsp.'
+         print 'Allowed entries and the keyword they add to control are:'
+         for k in disp_dict.keys():
+            print k + ' adds ' + disp_dict[k]
+
+         if not keep_going:
+            sys.exit()

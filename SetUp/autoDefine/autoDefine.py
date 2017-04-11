@@ -124,7 +124,7 @@ def optsParser( opts ):
     #function in commandWriters.py
     allowedKeys=[ '$title', '$coord', '$sym', '$internal', '$frag', '$basis', 
             '$hcore', '$eht', '$charge', '$occ', '$dft', '$ri', '$cc', 
-            '$rirpa', '$scf' ] 
+            '$rirpa', '$scf', '$dsp' ] 
     entries=[]
 
     line=opts.next()
@@ -264,34 +264,39 @@ def inputBuilder( directories, options, keep_going ):
 
         #Now move the define input file over and run define with it. 
         os.rename('def.input',dirs+'/def.input')
-        copyfile('templateCosmo.input',dirs+'/templateCosmo.input')
+#        copyfile('templateCosmo.input',dirs+'/templateCosmo.input')
         os.chdir(dirs)
         if os.path.exists('control'):
             os.remove('control')
 
         p=sp.Popen('define < def.input > def.out',shell=True)
         p.wait()
-        q=sp.Popen('cosmoprep < templateCosmo.input > cosmoprep.out',shell=True)
-        q.wait()
 
-        #Manually add $disp3 line at end of control file
-        p=sp.Popen("sed -i 's/\$end/\$disp3 bj\\n$end/' control",shell=True)
-
-        #Place setup files no longer needed in setup dir
-        if not os.path.exists('setup'):
-            os.makedirs('setup')
-        for i in ['input.xyz','options','templateCosmo.input','cosmoprep.out','def.input','def.out']:
-            try: os.rename(i,'setup/'+i)
-            except OSError: pass
-        os.chdir(workDir)
-
+#        p=sp.Popen('cosmoprep < templateCosmo.input > cosmoprep.out',shell=True)
+#        p.wait()
+#
+#
+#        #Place setup files no longer needed in setup dir
+#        if not os.path.exists('setup'):
+#            os.makedirs('setup')
+#        for i in ['input.xyz','options','templateCosmo.input','cosmoprep.out','def.input','def.out']:
+#            try: os.rename(i,'setup/'+i)
+#            except OSError: pass
 
         #Check if define finished, if the user did not choose
         #to ignore failed set ups, exit program 
-        if os.path.exists(dirs+'/tmp.input'):
+        if os.path.exists('tmp.input'):
             print 'Error: Define failed in '+dirs+'\n'
             if not keep_going:
                 sys.exit()
+        else:
+            #Post processing of control done here
+            cw.dsp(botSpecs, entries, keep_going)
+
+        os.chdir(workDir)
+
+
+
 
 
 if __name__ == '__main__':
