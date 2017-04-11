@@ -5,7 +5,7 @@ import os
 import re
 import argparse
 import subprocess as sp
-
+from shutil import copyfile
 
 import commandWriters as cw
 
@@ -262,15 +262,29 @@ def inputBuilder( directories, options, keep_going ):
         defInp.close()
 
 
-        #Now copy the define input file over and run define with it. 
+        #Now move the define input file over and run define with it. 
         os.rename('def.input',dirs+'/def.input')
+        copyfile('templateCosmo.input',dirs+'/templateCosmo.input')
         os.chdir(dirs)
         if os.path.exists('control'):
             os.remove('control')
 
         p=sp.Popen('define < def.input > def.out',shell=True)
         p.wait()
+        q=sp.Popen('cosmoprep < templateCosmo.input > cosmoprep.out',shell=True)
+        q.wait()
+
+        #Manually add $disp3 line at end of control file
+        p=sp.Popen("sed -i 's/\$end/\$disp3 bj\\n$end/' control",shell=True)
+
+        #Place setup files no longer needed in setup dir
+        if not os.path.exists('setup'):
+            os.makedirs('setup')
+        for i in ['input.xyz','options','templateCosmo.input','cosmoprep.out','def.input','def.out']:
+            try: os.rename(i,'setup/'+i)
+            except OSError: pass
         os.chdir(workDir)
+
 
         #Check if define finished, if the user did not choose
         #to ignore failed set ups, exit program 
