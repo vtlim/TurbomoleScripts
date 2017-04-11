@@ -5,7 +5,7 @@ import os
 import re
 import argparse
 import subprocess as sp
-
+from shutil import copyfile
 
 import commandWriters as cw
 
@@ -35,13 +35,8 @@ import commandWriters as cw
 #     'options' file, by default located in the 
 #     working directory and/or the directory specific 
 #     'options' located in the directories supplied as 
-#     argument or encoded in the directory name. 
+#     argument
 # 
-#   - dirParser(): Responsible for searching the supplied 
-#     directory names for valid options. The options 
-#     supplied in a directory name will override any 
-#     conflicting options found in an 'options' file. 
-#
 #   - Command Printers: The options from each 'options' file
 #     will be stored in lists.
 #     These lists will be passed to command printers.
@@ -64,20 +59,6 @@ import commandWriters as cw
 #     a control file as a template for the options file. But this does not 
 #     always make sense so deviate as you see fit. 
 #
-#   - The dirParser syntax should be command-line friendly. To 
-#     encourage this, convert options file entries like: 
-#           \n     --->       + (for sub-entries) *not used*
-#           ' '    --->       _
-#           $      --->       / (make a new directory)
-#           =      --->       % 
-#     
-#     Example:
-#             $rirpa          |
-#                npoints  200 |--->   .../rirpa+npoints_200+rpagrad/...
-#                rpagrad      |
-#
-#     The escape character used in this script is ^
-#
 #   - Your function should be defined in commandWriters.py
 #
 #   - Find a sensible place to put your function call in inputBuilder().
@@ -86,12 +67,11 @@ import commandWriters as cw
 #     An '&' should not appear in the define input file without
 #     very good reason. 
 #
-#   - Your function should take at least four arguments:
+#   - Your function should take at least three arguments:
 #     - A list of strings containing options from the user-specified
 #       options file.
 #     - A list of strings containing options from the directory specific
 #       options file.
-#     - A list of strings containing options from the directory names
 #     - an opened, writable, input file. 
 #
 #   - When printing your commands, make sure to finish with a new line
@@ -144,7 +124,7 @@ def optsParser( opts ):
     #function in commandWriters.py
     allowedKeys=[ '$title', '$coord', '$sym', '$internal', '$frag', '$basis', 
             '$hcore', '$eht', '$charge', '$occ', '$dft', '$ri', '$cc', 
-            '$rirpa', '$scf' ] 
+            '$rirpa', '$scf', '$dsp' ] 
     entries=[]
 
     line=opts.next()
@@ -172,46 +152,18 @@ def optsParser( opts ):
 
 
 
-#dirParser() Reads through the directory name supplied as argument and 
-#            makes a list of the valid options specified within. 
-#
-#   Input:
-#       directory - The name of the directory we are parsing
-#
-#   Output:
-#       entries - A list with sections and subsections defined
-#                 by the directory name. 
-def dirParser( directory ):
-    #Convert directory names to optsParser syntax
-    directory = escapeChars( directory )
-    sects=directory.split('/')
-
-    for i, entry in enumerate(sects):
-        entry='$'+entry
-        entry = entry.replace('_',' ')
-        entry = entry.replace('%','=')
-        sects[i] = entry+'\n'
-
-    #Make directory options look like they 
-    #came from a file. 
-    sects.append('$end')
-    dirSpecs=optsParser( iter(sects) )
-
-    return dirSpecs
-
-
-
 #inputBuilder() Manages creation of the define input file and runs define. 
 #               It calls all the functions for parsing input and writing 
 #               define commands. 
 #
 #   Input:
-#       directories - A list of strings containing the names of target 
-#                     directories. 
-#       options     - A string with the name of the user-defined options file. 
-#       keep_going  - If true run define for all directories even if define fails 
-#                     for one. 
-def inputBuilder( directories, options, keep_going ): 
+#       directories   - A list of strings containing the names of target 
+#                       directories. 
+#       options       - A string with the name of the user-defined options file. 
+#       keep_going    - If true run define for all directories even if define fails 
+#                       for one. 
+#       save_intermed - If true do not remove files generated in setting up control
+def inputBuilder( directories, options, keep_going, save_intermed ): 
     p=sp.Popen('pwd',stdout=sp.PIPE,shell=True)
     workDir=p.communicate()[0].strip()
 
@@ -247,9 +199,6 @@ def inputBuilder( directories, options, keep_going ):
             botSpecs=optsParser(botOpts)
             botOpts.close()
 
-        #getting options specified via directory name
-        dirSpecs=dirParser(dirs)
-        
         #One of these will be made for each directory supplied as
         #argument, then moved to that directory. 
         defInp=open('def.input','w')
@@ -263,83 +212,105 @@ def inputBuilder( directories, options, keep_going ):
         #Begin the command printers. These should be defined within
         #their own scripts to reduce clutter here. Be sure to mention
         #the proper syntax for providing them keywords there.
-        cw.title(dirSpecs, botSpecs, entries, defInp)
+        cw.title(botSpecs, entries, defInp)
 
 
         #Coordinate definition menu
-        cw.readCoord(dirSpecs, botSpecs, entries, defInp)
+        cw.readCoord(botSpecs, entries, defInp)
 
-        cw.assignSym(dirSpecs, botSpecs, entries, defInp)
+        cw.assignSym(botSpecs, entries, defInp)
 
-        cw.detInternals(dirSpecs, botSpecs, entries, defInp)
+        cw.detInternals(botSpecs, entries, defInp)
 
-        cw.assignFrags(dirSpecs, botSpecs, entries, defInp)
+        cw.assignFrags(botSpecs, entries, defInp)
 
         defInp.write('*\n\n')
 
 
         #Basis set definition menu
-        cw.defBasis(dirSpecs, botSpecs, entries, defInp)
+        cw.defBasis(botSpecs, entries, defInp)
 
         defInp.write('*\n')
  
 
         #Molecular orbital calculation menu
-        hcore=cw.useHcore(dirSpecs, botSpecs, entries, defInp)
+        hcore=cw.useHcore(botSpecs, entries, defInp)
 
         #Only run through eht if hcore not used. 
         if not hcore:
-            cw.eht(dirSpecs, botSpecs, entries, defInp)
+            cw.eht(botSpecs, entries, defInp)
 
-        cw.molCharge(dirSpecs, botSpecs, entries, defInp)
+        cw.molCharge(botSpecs, entries, defInp)
 
-        cw.setOcc(dirSpecs, botSpecs, entries, defInp)
+        cw.setOcc(botSpecs, entries, defInp)
 
         #Just to make sure we're through the previous menu. 
         defInp.write('\n\n\n')
         
 
         #Method definition menu
-        cw.dft(dirSpecs, botSpecs, entries, defInp)
+        cw.dft(botSpecs, entries, defInp)
 
-        cw.ri(dirSpecs, botSpecs, entries, defInp)
+        cw.ri(botSpecs, entries, defInp)
 
-        cw.cc(dirSpecs, botSpecs, entries, defInp)
+        cw.cc(botSpecs, entries, defInp)
 
-        cw.rirpa(dirSpecs, botSpecs, entries, defInp)
+        cw.rirpa(botSpecs, entries, defInp)
 
-        cw.scf(dirSpecs, botSpecs, entries, defInp)
+        cw.scf(botSpecs, entries, defInp)
 
         defInp.write('*')
         defInp.close()
 
 
-        #Now copy the define input file over and run define with it. 
+        #Now move the define input file over and run define with it. 
         os.rename('def.input',dirs+'/def.input')
+#        copyfile('templateCosmo.input',dirs+'/templateCosmo.input')
         os.chdir(dirs)
         if os.path.exists('control'):
             os.remove('control')
 
         p=sp.Popen('define < def.input > def.out',shell=True)
         p.wait()
-        os.chdir(workDir)
+
+        if not save_intermed:
+            os.remove('def.input')
+            os.remove('def.out')
+
+#        p=sp.Popen('cosmoprep < templateCosmo.input > cosmoprep.out',shell=True)
+#        p.wait()
+#
+#
+#        #Place setup files no longer needed in setup dir
+#        if not os.path.exists('setup'):
+#            os.makedirs('setup')
+#        for i in ['input.xyz','options','templateCosmo.input','cosmoprep.out','def.input','def.out']:
+#            try: os.rename(i,'setup/'+i)
+#            except OSError: pass
 
         #Check if define finished, if the user did not choose
         #to ignore failed set ups, exit program 
-        if os.path.exists(dirs+'/tmp.input'):
+        if os.path.exists('tmp.input'):
             print 'Error: Define failed in '+dirs+'\n'
             if not keep_going:
                 sys.exit()
+        else:
+            #Post processing of control done here
+            cw.dsp(botSpecs, entries, keep_going)
+
+        os.chdir(workDir)
+
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for setting up Turbomole'
            + ' calculations. Takes as argument a list of directories containing'
-           + ' coord files. Will delete any control file already present, and run'
-           + ' define based on options specified in the global options'
-           + ' file (called ./options or specified with option -o), through' 
-           + ' the directory name (see script), or through the local options'
-           + ' file (called options and located in the argument directory).')
+           + ' coord files. Will delete any control file already present, and '
+           + ' run define based on options specified in the global options'
+           + ' file (called ./options or specified with option -o), or through'
+           + ' the local options file (called options and located in'
+           + ' the argument directory).')
     parser.add_argument('dirs',nargs='*',default='.', help='The directories'
            + ' containing the coord files to be used with define.'
            + ' (ex: dir1 dir2 ...) (Default: current directory) ')
@@ -348,7 +319,9 @@ if __name__ == '__main__':
            + ' (ex: -o global_options) (Default: ./options)')
     parser.add_argument('-k','--keep_going', action='store_true',
             help='Continue iterating through directories even if define fails.')
+    parser.add_argument('-i','--save_intermed', action='store_true',
+            help='Do not remove files generated while setting up control')
     args = parser.parse_args()
 
     
-    inputBuilder(args.dirs, args.options, args.keep_going)
+    inputBuilder(args.dirs, args.options, args.keep_going, args.save_intermed)
