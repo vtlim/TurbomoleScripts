@@ -157,12 +157,13 @@ def optsParser( opts ):
 #               define commands. 
 #
 #   Input:
-#       directories - A list of strings containing the names of target 
-#                     directories. 
-#       options     - A string with the name of the user-defined options file. 
-#       keep_going  - If true run define for all directories even if define fails 
-#                     for one. 
-def inputBuilder( directories, options, keep_going ): 
+#       directories   - A list of strings containing the names of target 
+#                       directories. 
+#       options       - A string with the name of the user-defined options file. 
+#       keep_going    - If true run define for all directories even if define fails 
+#                       for one. 
+#       save_intermed - If true do not remove files generated in setting up control
+def inputBuilder( directories, options, keep_going, save_intermed ): 
     p=sp.Popen('pwd',stdout=sp.PIPE,shell=True)
     workDir=p.communicate()[0].strip()
 
@@ -272,6 +273,10 @@ def inputBuilder( directories, options, keep_going ):
         p=sp.Popen('define < def.input > def.out',shell=True)
         p.wait()
 
+        if not save_intermed:
+            os.remove('def.input')
+            os.remove('def.out')
+
 #        p=sp.Popen('cosmoprep < templateCosmo.input > cosmoprep.out',shell=True)
 #        p.wait()
 #
@@ -298,7 +303,6 @@ def inputBuilder( directories, options, keep_going ):
 
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for setting up Turbomole'
            + ' calculations. Takes as argument a list of directories containing'
@@ -315,7 +319,9 @@ if __name__ == '__main__':
            + ' (ex: -o global_options) (Default: ./options)')
     parser.add_argument('-k','--keep_going', action='store_true',
             help='Continue iterating through directories even if define fails.')
+    parser.add_argument('-i','--save_intermed', action='store_true',
+            help='Do not remove files generated while setting up control')
     args = parser.parse_args()
 
     
-    inputBuilder(args.dirs, args.options, args.keep_going)
+    inputBuilder(args.dirs, args.options, args.keep_going, args.save_intermed)
