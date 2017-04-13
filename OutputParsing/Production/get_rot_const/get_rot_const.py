@@ -15,8 +15,12 @@ import sys
 import argparse
 
 
+class KnownError(Exception):
+    """Used to report anticipated errors"""
+    pass
 
-def get_atom_weight( atom ):
+
+def get_atom_weight(atom):
     """
     Look-up table for atomic weights given atomic labels
 
@@ -42,14 +46,14 @@ def get_atom_weight( atom ):
     try:
         return dict[atom]
     except KeyError:
-        print("'" + atom + "' isn't in the dictionary yet. Why not add it?\n")
-        raise
+        raise KnownError("'" + atom + "' isn't in the dictionary yet. Why not"
+                + " add it?")
 
 
-def make_inertia_tensor( xyz_at ):
+def make_inertia_tensor(xyz_at):
     """
     Given a system's atomic coordinates and atomic labels return its inertia
-    tensor
+    tensor. 
 
     Input:
     xyz_at - 2D list with format [ [x1,y1,z1,at1] , [x2,y2,z2,at2], ... ].
@@ -57,97 +61,120 @@ def make_inertia_tensor( xyz_at ):
              entries are floats. (type: N x 4 iterable)
 
     Output:
-        itens - The inertia tensor, output as a 2D array. (type: list)
+    itens - The inertia tensor, output as a 2D array. (type: list)
     """
     # Check iterable
-    try:
-        assert(hasattr(xyz_at,'__iter__'))
-    except AssertionError:
-        print('Error: Argument to make_inertia_tensor must be iterable')
-        raise
+    assert hasattr(xyz_at,'__iter__'), \
+        'Argument to make_inertia_tensor must be iterable'
     
-    # Check argument has elements
+    # Check xyz_at has elements
     try:
-        assert(len(xyz_at) != 0)
+        assert len(xyz_at) != 0, \
+            'Empty list passed to make_inertia_tensor, check coord file'
     except TypeError: 
-        print('Error: Iterable passed to make_inertia_tensor'
-            + ' must implement __len__')
-        raise
-    except AssertionError:
-        print('Error: Empty list passed to make_inertia_tensor, check'
-            + ' your coord file')
-        raise
+        raise KnownError('Iterable passed to make_inertia_tensor must'
+                + ' implement __len__')
 
     ixx = ixy = ixz = iyy = iyz = izz = 0
     tot_weight = 0
-    xcom = ycom = zcom = 0
+    com = np.array([0, 0, 0],dtype=np.float64)
     # With some algebra each inertia tensor entry can be put in a form
     # requiring a single loop to build.  
     for entry in xyz_at:
         try:
-            assert(len(entry) == 4)
+            assert len(entry) == 4,'Entries of xyz_at must have 4 entries'
         except TypeError: 
-            print('Error: Entries of xyz_at must implement __len__')
-            raise
-        except AssertionError:
-            print('Error: Entries of xyz_at must have 4 entries')
-            raise
+            raise KnownError('Entries of xyz_at must implement __len__')
 
         try:
-            entry[0:3] = list(map(float, entry[0:3]))
-            assert(isinstance(entry[3],str))
+            assert isinstance(entry[3],str), \
+                'Entries of xyz_at must have a string as their fourth entry'
+            at_weight = get_atom_weight(entry[3])
+            entry = np.array(list(map(float, entry[0:3])))
         except ValueError:
-            print('Error: Entries of xyz_at must have floats as their first'
-                + ' 3 entries')
-            raise
+            raise KnownError('Entries of xyz_at must have floats as their'
+                    + ' first 3 entries')
         except TypeError:
-            print('Error: Entries of xyz_at must be indexable')
-            raise
-        except AssertionError:
-            print('Error: Entries of xyz_at must have a string as their'
-                + ' fourth entry')
-            raise
+            raise KnownError('Entries of xyz_at must be indexable')
 
-        at_weight = get_atom_weight(entry[3])
         tot_weight += at_weight
-      
+
         ixx += (entry[1]**2 + entry[2]**2)*at_weight
-        ixy -= (entry[0]*entry[1])*at_weight
-        ixz -= (entry[0]*entry[2])*at_weight
-
         iyy += (entry[0]**2 + entry[2]**2)*at_weight
-        iyz -= (entry[1]*entry[2])*at_weight
-
         izz += (entry[0]**2 + entry[1]**2)*at_weight
 
-        xcom += entry[0]*at_weight
-        ycom += entry[1]*at_weight
-        zcom += entry[2]*at_weight
+        ixy -= (entry[0]*entry[1])*at_weight
+        ixz -= (entry[0]*entry[2])*at_weight
+        iyz -= (entry[1]*entry[2])*at_weight
+
+        com += entry*at_weight
 
     # Note ?com must be divided by tot_weight to be
     # center of mass coordinates here. 
-    ixx = ixx - (ycom**2 + zcom**2)/tot_weight
-    iyy = iyy - (xcom**2 + zcom**2)/tot_weight
-    izz = izz - (xcom**2 + ycom**2)/tot_weight
+    ixx -= (com[1]**2 + com[2]**2)/tot_weight
+    iyy -= (com[0]**2 + com[2]**2)/tot_weight
+    izz -= (com[0]**2 + com[1]**2)/tot_weight
 
-    ixy = ixy + (xcom*ycom)/tot_weight
-    ixz = ixz + (xcom*zcom)/tot_weight
-    iyz = iyz + (ycom*zcom)/tot_weight
+    ixy += (com[0]*com[1])/tot_weight
+    ixz += (com[0]*com[2])/tot_weight
+    iyz += (com[1]*com[2])/tot_weight
 
     itens = [ [ixx, ixy, ixz],
               [ixy, iyy, iyz],
               [ixz, iyz, izz] ]
-
     return itens
 
 
-def get_rot_const( coord ):
+def read_coord(fil):
     """
-    Calculates the 3 rotational constants for a molecule
+    Read the entries in a Turbomole format coord file. 
 
     Input:
-    coord - Opened Turbomole format coord file. 
-            Assumes units of Bohr radii (file)
+    fil - String with path to Turbomole format coord file. (Type: String)
+
+    Output:
+    at_array - List of coordinates (float) and atomic labels (String) in 
+               coord file. Each entry has format [x, y, z, at].
+               (Type: N x 4 list) 
+    """
+    try:
+        coord = open(fil, 'r')
+    except IOError:
+        raise KnownError('Could not open file '+fil+' for reading.')
+    at_array = []
+    started=False
+    for line in coord:
+        if line.find('$coord') != -1 :
+            started = True
+        elif line.find('$') != -1 :
+            started = False
+
+        elif started :
+            line = line.strip('\n')
+            entry = line.split()
+            assert len(entry) == 4, \
+                'The line for each atom in coord file must have 4 entries'
+
+            try:
+                entry[0:3] = list(map(float, entry[0:3]))
+            except ValueError:
+                raise KnownError('First 3 entries for each atom must be'
+                        + ' floats')
+
+            at_array.append(entry)
+    return at_array
+
+
+def get_rot_const(fil):
+    """
+    Calculates the 3 rotational constants for a molecule. (in MHz)
+
+    Formula: hbar^2/(2I), where I is the moment of inertia about
+    a principle axis of rotation
+
+    Input:
+    fil - String with path to Turbomole format coord file. 
+          Assumes units of Bohr radii. (Type: String)
 
     Output:
     vals - List of rotational constants in MHz, sorted 
@@ -155,27 +182,11 @@ def get_rot_const( coord ):
     """
     # Conversion factors and coeffs to get hbar^2/2I in units of MHz. 
     co = 1.804741074*10**6 
-    at_array = []
-    started=False
-    for line in coord:
-        if line.find('$coord') != -1 :
-            started = True
 
-        elif line.find('$') != -1 :
-            started = False
-
-        elif started :
-            line = line.strip('\n')
-            entry = line.split()
-
-            at_array.append(entry)
-
+    at_array = read_coord(fil)
     itens = make_inertia_tensor(at_array)
     vals, vects = np.linalg.eig(itens)
-
-    vals[0] = co/vals[0]
-    vals[1] = co/vals[1]
-    vals[2] = co/vals[2]
+    vals = co/vals
 
     return sorted(vals, reverse=True)
 
@@ -191,11 +202,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     for fil in args.coords: 
+        # Assume error local to a single file
         try:
-            coord = open(fil, 'r')
-            rots = get_rot_const(coord)
+            rots = get_rot_const(fil)
             print(fil + ' - A: ', rots[0], ' MHz, B: ', rots[1], 
                   ' MHz, C: ', rots[2], ' MHz')
-        except IOError:
-            print('Error: Could not open file '+fil+' for reading.'
-                + ' Processing remaining files')
+        except (AssertionError, KnownError) as err:
+            print('Error:',err,file=sys.stderr)
+            print('get_rot_const failed for file: '+ fil + '\n'
+                + 'Processing remaining files',file=sys.stderr)
