@@ -72,7 +72,7 @@ def make_inertia_tensor(xyz_at):
             'Empty list passed to make_inertia_tensor, check coord file'
     except TypeError: 
         raise KnownError('Iterable passed to make_inertia_tensor must'
-                + ' implement __len__')
+                + ' have a length')
 
     ixx = ixy = ixz = iyy = iyz = izz = 0
     tot_weight = 0
@@ -83,13 +83,13 @@ def make_inertia_tensor(xyz_at):
         try:
             assert len(entry) == 4,'Entries of xyz_at must have 4 entries'
         except TypeError: 
-            raise KnownError('Entries of xyz_at must implement __len__')
+            raise KnownError('Entries of xyz_at must have a length')
 
         try:
             assert isinstance(entry[3],str), \
                 'Entries of xyz_at must have a string as their fourth entry'
             at_weight = get_atom_weight(entry[3])
-            entry = np.array(list(map(float, entry[0:3])))
+            entry = np.array(list(map(np.float64, entry[0:3])))
         except ValueError:
             raise KnownError('Entries of xyz_at must have floats as their'
                     + ' first 3 entries')
