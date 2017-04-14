@@ -142,7 +142,9 @@ def read_coord(fil):
         raise KnownError('Could not open file '+fil+' for reading.')
     at_array = []
     started=False
+    lc = 0
     for line in coord:
+        lc += 1
         if line.find('$coord') != -1 :
             started = True
         elif line.find('$') != -1 :
@@ -152,13 +154,13 @@ def read_coord(fil):
             line = line.strip('\n')
             entry = line.split()
             assert len(entry) == 4, \
-                'The line for each atom in coord file must have 4 entries'
+                'Line '+str(lc)+' in '+fil+' must have 4 entries'
 
             try:
                 entry[0:3] = list(map(float, entry[0:3]))
             except ValueError:
-                raise KnownError('First 3 entries for each atom must be'
-                        + ' floats')
+                raise KnownError('Line '+str(lc)+' in '+fil+' must have floats'
+                        + ' for its first 3 entries')
 
             at_array.append(entry)
     return at_array
