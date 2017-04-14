@@ -182,10 +182,16 @@ def get_rot_const(fil):
     """
     # Conversion factors and coeffs to get hbar^2/2I in units of MHz. 
     co = 1.804741074*10**6 
+    tol = 10**(-8)
 
     at_array = read_coord(fil)
     itens = make_inertia_tensor(at_array)
     vals, vects = np.linalg.eig(itens)
+
+    for i in range(len(vals)):
+        if vals[i] < tol:
+            vals[i] = -1
+
     vals = co/vals
 
     return sorted(vals, reverse=True)
@@ -205,8 +211,12 @@ if __name__ == '__main__':
         # Assume error local to a single file
         try:
             rots = get_rot_const(fil)
-            print(fil + ' - A: ', rots[0], ' MHz, B: ', rots[1], 
-                  ' MHz, C: ', rots[2], ' MHz')
+            axes = ['A: ','B: ','C: ']
+            print(fil + ' - ',end='')
+            for i in range(len(axes)):
+                if rots[i] > 0:
+                    print(axes[i], rots[i], ' MHz ',end='')
+            print()
         except (AssertionError, KnownError) as err:
             print('Error:',err,file=sys.stderr)
             print('get_rot_const failed for file: '+ fil + '\n'
