@@ -25,10 +25,10 @@ def get_atom_weight(atom):
     Look-up table for atomic weights given atomic labels
 
     Input: 
-    atom - The atomic label (type: String)
+    atom - The atomic label (Type: String)
 
     Output:
-    dict[atom] - Atomic weight of atom. (type: float)
+    dict[atom] - Atomic weight of atom. (Type: float)
     """
 
     # atomic masses ( in 'g/mol' aka. 'u' - often written 'amu' ) taken from: 
@@ -46,8 +46,7 @@ def get_atom_weight(atom):
     try:
         return dict[atom]
     except KeyError:
-        raise KnownError("'" + atom + "' isn't in the dictionary yet. Why not"
-                + " add it?")
+        raise KnownError("'" + atom + "' isn't in the dictionary yet.")
 
 
 def make_inertia_tensor(xyz_at):
@@ -57,11 +56,11 @@ def make_inertia_tensor(xyz_at):
 
     Input:
     xyz_at - 2D list with format [ [x1,y1,z1,at1] , [x2,y2,z2,at2], ... ].
-             Note at's should be strings identifiable by get_atom_weight, other
-             entries are floats. (type: N x 4 iterable)
+             x, y, z must be castable to float, at is a string identifiable by 
+             get_atom_weight. (Type: N x 4 iterable)
 
     Output:
-    itens - The inertia tensor, output as a 2D array. (type: list)
+    itens - The inertia tensor, output as a 2D array. (Type: list)
     """
     # Check iterable
     assert hasattr(xyz_at,'__iter__'), \
@@ -109,7 +108,7 @@ def make_inertia_tensor(xyz_at):
 
         com += entry*at_weight
 
-    # Note ?com must be divided by tot_weight to be
+    # Note com must be divided by tot_weight to be
     # center of mass coordinates here. 
     ixx -= (com[1]**2 + com[2]**2)/tot_weight
     iyy -= (com[0]**2 + com[2]**2)/tot_weight
@@ -177,8 +176,8 @@ def get_rot_const(fil):
           Assumes units of Bohr radii. (Type: String)
 
     Output:
-    vals - List of rotational constants in MHz, sorted 
-           largest to smallest (type: list)
+    vals - List of rotational constants in MHz (float), sorted 
+           largest to smallest (Type: list)
     """
     # Conversion factors and coeffs to get hbar^2/2I in units of MHz. 
     co = 1.804741074*10**6 
@@ -189,7 +188,7 @@ def get_rot_const(fil):
     vals, vects = np.linalg.eig(itens)
 
     # Atoms and linear molecules have less than 3 moments of inertia. 
-    # The excess moments of inertia have 0-valued eigenvalues
+    # The excess moments of inertia are 0-valued
     for i in range(len(vals)):
         if vals[i] < tol:
             vals[i] = -1
