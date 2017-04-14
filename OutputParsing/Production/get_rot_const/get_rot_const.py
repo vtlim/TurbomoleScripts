@@ -188,6 +188,8 @@ def get_rot_const(fil):
     itens = make_inertia_tensor(at_array)
     vals, vects = np.linalg.eig(itens)
 
+    # Atoms and linear molecules have less than 3 moments of inertia. 
+    # The excess moments of inertia have 0-valued eigenvalues
     for i in range(len(vals)):
         if vals[i] < tol:
             vals[i] = -1
