@@ -193,6 +193,35 @@ def assignSym(botSpecs, entries, defInp):
             else:
                defInp.write('sy '+group+'\n')
 
+#fix() specifies part of geometry to restrain
+#within internal coordinate sub-menu.
+#Only type=tors currently supported.
+#
+#Default: $fix omitted - restraint not used
+#
+#KeyFormat: $fix type=[label] atoms=[label1,label2,label3,label4]
+def fix(botSpecs, entries, defInp):
+   key='$fix'
+
+   fix=getLine(entries, key)
+   fixBot=getLine(botSpecs, key)
+
+   if fixBot:
+      fix = fixBot
+
+   if fix:
+      defInp.write('idef\n')
+      if 'type=' in fix:
+         ftype=fix.split('type=')[1]
+         ftype=ftype.split()[0]
+         defInp.write('f '+ftype)
+      if 'atoms=' in fix:
+         atoms=fix.split('atoms=')[1]
+         atoms=atoms.split(',')
+         for a in atoms:
+             defInp.write(' ' + a)
+      
+      defInp.write('\n\n\n\n')
 
 
 #detInternals() tells whether internal redundant coordinates
@@ -755,6 +784,7 @@ def scf(botSpecs, entries, defInp):
 
 
       defInp.write('\n')
+
 
 ################################################################################
 #                             Begin Post Processing                            #
