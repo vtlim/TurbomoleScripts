@@ -240,12 +240,12 @@ def fix(botSpecs, entries, defInp):
                count -= 1
                
             count += 1
-            if typeDict[ftype] != count:
-               print 'Error: wrong number of indices specified in - '+f
-               return
-            
             defInp.write(' ' + a)
          defInp.write('\n')
+         
+         if typeDict[ftype] != count:
+            print 'Error: wrong number of indices specified in - '+f
+            return
          
       defInp.write('\n\n\n\n')
 
