@@ -496,7 +496,6 @@ def eht(botSpecs, entries, defInp):
 
 
 
-
 #molCharge() define the molecular charge
 #
 #Default: 0
@@ -791,8 +790,8 @@ def scf(botSpecs, entries, defInp):
 ################################################################################
 
 
-#cosmo() writes input for cosmoprep, allowing user to specify
-#epsilon and refractive index.
+#cosmo() writes cosmoprep input, currently only
+#epsilon and refractive index may be specified. 
 #
 #Default: '$cosmo' omitted - don't use cosmo
 #          $cosmo used     - epsilon=infinity
@@ -807,7 +806,7 @@ def scf(botSpecs, entries, defInp):
 #                          - refind= 1.3
 #
 #KeyFormat: $cosmo epsilon=[epsilon] refind=[refind]
-def cosmo(botSpecs, entries, defInp):
+def cosmo(botSpecs, entries):
    key='$cosmo'
 
    cosmo=getLine(entries, key)
@@ -817,18 +816,18 @@ def cosmo(botSpecs, entries, defInp):
       cosmo = cosmoBot
 
    if cosmo:
+      cosInp = open('cosmoprep.input','w')
       if 'epsilon=' in cosmo:
          eps=cosmo.split('epsilon=')[1]
          eps=eps.split()[0]
-         defInp.write(eps)
+         cosInp.write(eps+'\n')
       if 'refind=' in cosmo:
          rind=cosmo.split('refind=')[1]
          rind=rind.split[0]
-         defInp.write(rind)
-      for i in range(11):
-         defInp.write('\n')
-
-      defInp.write('r all o\n*\n\n\n')
+         cosInp.write(rind+'\n')
+         
+      cosInp.write('\n'*11)
+      cosInp.write('r all o\n*\n\n\n')
 
 
 ################################################################################
