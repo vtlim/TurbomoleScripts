@@ -193,34 +193,60 @@ def assignSym(botSpecs, entries, defInp):
             else:
                defInp.write('sy '+group+'\n')
 
-#fix() specifies part of geometry to restrain
-#within internal coordinate sub-menu.
-#Only type=tors currently supported.
+#fix() handles specification of frozen internal coordinates.
+#type takes values: stre,invr,bend,outp,tors,linc,linp
+#See section 4.1.2 of the Turbomole manual to learn how atomic 
+#indices should be specified for each type. 
 #
-#Default: $fix omitted - restraint not used
+#comp and ring type specifications not currently supported
 #
-#KeyFormat: $fix type=[label] atoms=[label1,label2,label3,label4]
+#Default: $fix used/omitted - restraint not used
+#
+#KeyFormat: $fix [type]=[1-4,6]
 def fix(botSpecs, entries, defInp):
+   typeDict = {'stre' : 2,
+               'invr' : 2,
+               'bend' : 3,
+               'outp' : 4,
+               'tors' : 4,
+               'linc' : 4,
+               'linp' : 4 }
    key='$fix'
 
    fix=getLine(entries, key)
    fixBot=getLine(botSpecs, key)
 
    if fixBot:
+      if fix:
+         print 'Warning: frozen coordinates specified in top' \
+             + ' level options file will be overridden'
       fix = fixBot
 
    if fix:
       defInp.write('idef\n')
-      if 'type=' in fix:
-         ftype=fix.split('type=')[1]
-         ftype=ftype.split()[0]
+      for f in fix.split():
+         ftype, atoms = f.split('=')
          defInp.write('f '+ftype)
-      if 'atoms=' in fix:
-         atoms=fix.split('atoms=')[1]
+         
          atoms=atoms.split(',')
+         count = 0
          for a in atoms:
-             defInp.write(' ' + a)
-      
+            if '-' in a:
+               rnge = range(int(a.split('-')[0]),int(a.split('-')[1]+1))
+               a = ''
+               for at in rnge:
+                  a += str(at) + ' '
+                  count += 1
+               count -= 1
+               
+            count += 1
+            if typeDict[ftype] != count:
+               print 'Error: wrong number of indices specified in - '+f
+               return
+            
+            defInp.write(' ' + a)
+         defInp.write('\n')
+         
       defInp.write('\n\n\n\n')
 
 
