@@ -193,6 +193,65 @@ def assignSym(botSpecs, entries, defInp):
             else:
                defInp.write('sy '+group+'\n')
 
+#fix() handles specification of frozen internal coordinates.
+#type takes values: stre,invr,bend,outp,tors,linc,linp
+#See section 4.1.2 of the Turbomole manual to learn how atomic 
+#indices should be specified for each type. 
+#
+#comp and ring type specifications not currently supported
+#
+#Default: $fix used/omitted - restraint not used
+#
+#KeyFormat: $fix [type]=[1-4,6]
+def fix(botSpecs, entries, defInp):
+   typeDict = {'stre' : 2,
+               'invr' : 2,
+               'bend' : 3,
+               'outp' : 4,
+               'tors' : 4,
+               'linc' : 4,
+               'linp' : 4 }
+   key='$fix'
+
+   fix=getLine(entries, key)
+   fixBot=getLine(botSpecs, key)
+
+   if fixBot:
+      if fix:
+         print 'Warning: frozen coordinates specified in top' \
+             + ' level options file will be overridden'
+      fix = fixBot
+
+   if fix:
+      defInp.write('idef\n')
+      for f in fix.split():
+         ftype, atoms = f.split('=')
+         defInp.write('f '+ftype)
+         
+         atoms=atoms.split(',')
+         count = 0
+         for a in atoms:
+            if '-' in a:
+               rnge = range(int(a.split('-')[0]),int(a.split('-')[1]+1))
+               a = ''
+               for at in rnge:
+                  a += str(at) + ' '
+                  count += 1
+               count -= 1
+               
+            count += 1
+            defInp.write(' ' + a)
+         defInp.write('\n')
+         
+         try: 
+            if typeDict[ftype] != count:
+               print 'Error: wrong number of indices specified in - '+f
+               return
+         except KeyError:
+            print 'Error: '+ftype+' is not an allowed constraint type'
+            return
+         
+      defInp.write('\n\n\n\n')
 
 
 #detInternals() tells whether internal redundant coordinates
@@ -464,7 +523,6 @@ def eht(botSpecs, entries, defInp):
    #Will either skip the Hueckel modifying section or exit
    #the atom pair section depending on choices. 
    defInp.write('\n')
-
 
 
 
@@ -755,6 +813,52 @@ def scf(botSpecs, entries, defInp):
 
 
       defInp.write('\n')
+
+
+################################################################################
+#                             Begin Cosmoprep Writer                           #
+################################################################################
+
+
+#cosmo() writes cosmoprep input, currently only
+#epsilon and refractive index may be specified. 
+#
+#Default: '$cosmo' omitted - don't use cosmo
+#          $cosmo used     - epsilon=infinity
+#                          - nppa= 1082
+#                          - nspa=   92
+#                          - disex= 10.0000
+#                          - rsolv= 1.30
+#                          - routf= 0.85
+#                          - cavity closed
+#                          - ampran= 0.1D-04
+#                          - phsran= 0.0
+#                          - refind= 1.3
+#
+#KeyFormat: $cosmo epsilon=[epsilon] refind=[refind]
+def cosmo(botSpecs, entries):
+   key='$cosmo'
+
+   cosmo=getLine(entries, key)
+   cosmoBot=getLine(botSpecs, key)
+
+   if cosmoBot:
+      cosmo = cosmoBot
+
+   if cosmo:
+      cosInp = open('cosmoprep.input','w')
+      if 'epsilon=' in cosmo:
+         eps=cosmo.split('epsilon=')[1]
+         eps=eps.split()[0]
+         cosInp.write(eps+'\n')
+      if 'refind=' in cosmo:
+         rind=cosmo.split('refind=')[1]
+         rind=rind.split[0]
+         cosInp.write(rind+'\n')
+         
+      cosInp.write('\n'*11)
+      cosInp.write('r all o\n*\n\n\n')
+
 
 ################################################################################
 #                             Begin Post Processing                            #
