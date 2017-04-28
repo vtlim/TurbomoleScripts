@@ -124,7 +124,7 @@ def optsParser( opts ):
     #function in commandWriters.py
     allowedKeys=[ '$title', '$coord', '$sym', '$internal', '$frag', '$basis', 
             '$hcore', '$eht', '$charge', '$occ', '$dft', '$ri', '$cc', 
-            '$rirpa', '$scf', '$dsp', '$fix' ] 
+            '$rirpa', '$scf', '$dsp', '$fix', '$cosmo' ] 
     entries=[]
 
     line=opts.next()
@@ -163,7 +163,7 @@ def optsParser( opts ):
 #       keep_going    - If true run define for all directories even if define fails 
 #                       for one. 
 #       save_intermed - If true do not remove files generated in setting up control
-def inputBuilder( directories, options, keep_going, save_intermed, cosmo ): 
+def inputBuilder( directories, options, keep_going, save_intermed ): 
     p=sp.Popen('pwd',stdout=sp.PIPE,shell=True)
     workDir=p.communicate()[0].strip()
 
@@ -277,8 +277,10 @@ def inputBuilder( directories, options, keep_going, save_intermed, cosmo ):
         if not save_intermed:
             os.remove('def.input')
             os.remove('def.out')
-
-        if cosmo:
+        if any("cosmo" in s for s in entries):
+            cosInp=open('cosmoprep.input','w')
+            cw.cosmo(botSpecs, entries, cosInp)
+            cosInp.close()
             if not os.path.exists(dirs+'/cosmoprep.input'):
                 copyfile('cosmoprep.input',dirs+'/cosmoprep.input')
             p=sp.Popen('cosmoprep < cosmoprep.input > cosmoprep.out',shell=True)
@@ -325,10 +327,7 @@ if __name__ == '__main__':
             help='Continue iterating through directories even if define fails.')
     parser.add_argument('-i','--save_intermed', action='store_true',
             help='Do not remove files generated while setting up control')
-    parser.add_argument('-c','--cosmo', default=False, action='store_true',
-            help='Run cosmoprep. Limited to general input file for all mols,'
-           + 'named cosmoprep.input.')
     args = parser.parse_args()
 
     
-    inputBuilder(args.dirs, args.options, args.keep_going, args.save_intermed, args.cosmo)
+    inputBuilder(args.dirs, args.options, args.keep_going, args.save_intermed)

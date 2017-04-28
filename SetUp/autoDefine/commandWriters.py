@@ -787,6 +787,51 @@ def scf(botSpecs, entries, defInp):
 
 
 ################################################################################
+#                             Begin Cosmoprep Writer                           #
+################################################################################
+
+
+#cosmo() writes input for cosmoprep, allowing user to specify
+#epsilon and refractive index.
+#
+#Default: '$cosmo' omitted - don't use cosmo
+#          $cosmo used     - epsilon=infinity
+#                          - nppa= 1082
+#                          - nspa=   92
+#                          - disex= 10.0000
+#                          - rsolv= 1.30
+#                          - routf= 0.85
+#                          - cavity closed
+#                          - ampran= 0.1D-04
+#                          - phsran= 0.0
+#                          - refind= 1.3
+#
+#KeyFormat: $cosmo epsilon=[epsilon] refind=[refind]
+def cosmo(botSpecs, entries, defInp):
+   key='$cosmo'
+
+   cosmo=getLine(entries, key)
+   cosmoBot=getLine(botSpecs, key)
+
+   if cosmoBot:
+      cosmo = cosmoBot
+
+   if cosmo:
+      if 'epsilon=' in cosmo:
+         eps=cosmo.split('epsilon=')[1]
+         eps=eps.split()[0]
+         defInp.write(eps)
+      if 'refind=' in cosmo:
+         rind=cosmo.split('refind=')[1]
+         rind=rind.split[0]
+         defInp.write(rind)
+      for i in range(11):
+         defInp.write('\n')
+
+      defInp.write('r all o\n*\n\n\n')
+
+
+################################################################################
 #                             Begin Post Processing                            #
 ################################################################################
 
