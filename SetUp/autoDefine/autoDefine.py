@@ -281,8 +281,6 @@ def inputBuilder( directories, options, keep_going, save_intermed ):
             cosInp=open('cosmoprep.input','w')
             cw.cosmo(botSpecs, entries, cosInp)
             cosInp.close()
-            if not os.path.exists(dirs+'/cosmoprep.input'):
-                copyfile('cosmoprep.input',dirs+'/cosmoprep.input')
             p=sp.Popen('cosmoprep < cosmoprep.input > cosmoprep.out',shell=True)
             p.wait()
 
