@@ -243,8 +243,12 @@ def fix(botSpecs, entries, defInp):
             defInp.write(' ' + a)
          defInp.write('\n')
          
-         if typeDict[ftype] != count:
-            print 'Error: wrong number of indices specified in - '+f
+         try: 
+            if typeDict[ftype] != count:
+               print 'Error: wrong number of indices specified in - '+f
+               return
+         except KeyError:
+            print 'Error: '+ftype+' is not an allowed constraint type'
             return
          
       defInp.write('\n\n\n\n')
