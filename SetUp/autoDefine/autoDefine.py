@@ -124,7 +124,7 @@ def optsParser( opts ):
     #function in commandWriters.py
     allowedKeys=[ '$title', '$coord', '$sym', '$internal', '$frag', '$basis', 
             '$hcore', '$eht', '$charge', '$occ', '$dft', '$ri', '$cc', 
-            '$rirpa', '$scf', '$dsp' ] 
+            '$rirpa', '$scf', '$dsp', '$fix', '$cosmo' ] 
     entries=[]
 
     line=opts.next()
@@ -185,8 +185,6 @@ def inputBuilder( directories, options, keep_going, save_intermed ):
                                      'Continue? [y/n]\n')
 
 
-
-
     #Iterate through all argument directory paths. If 
     #no directories were supplied, do this for the working
     #directory. 
@@ -219,6 +217,8 @@ def inputBuilder( directories, options, keep_going, save_intermed ):
         cw.readCoord(botSpecs, entries, defInp)
 
         cw.assignSym(botSpecs, entries, defInp)
+
+        cw.fix(botSpecs, entries, defInp)
 
         cw.detInternals(botSpecs, entries, defInp)
 
@@ -265,28 +265,27 @@ def inputBuilder( directories, options, keep_going, save_intermed ):
 
         #Now move the define input file over and run define with it. 
         os.rename('def.input',dirs+'/def.input')
-#        copyfile('templateCosmo.input',dirs+'/templateCosmo.input')
         os.chdir(dirs)
         if os.path.exists('control'):
             os.remove('control')
 
         p=sp.Popen('define < def.input > def.out',shell=True)
         p.wait()
-
+        
         if not save_intermed:
             os.remove('def.input')
             os.remove('def.out')
 
-#        p=sp.Popen('cosmoprep < templateCosmo.input > cosmoprep.out',shell=True)
-#        p.wait()
-#
-#
-#        #Place setup files no longer needed in setup dir
-#        if not os.path.exists('setup'):
-#            os.makedirs('setup')
-#        for i in ['input.xyz','options','templateCosmo.input','cosmoprep.out','def.input','def.out']:
-#            try: os.rename(i,'setup/'+i)
-#            except OSError: pass
+            
+        if any("$cosmo" in s for s in entries):
+            cw.cosmo(botSpecs, entries)
+            p=sp.Popen('cosmoprep < cosmoprep.input > cosmoprep.out',shell=True)
+            p.wait()
+            
+            if not save_intermed:
+                os.remove('cosmoprep.input')
+                os.remove('cosmoprep.out')
+
 
         #Check if define finished, if the user did not choose
         #to ignore failed set ups, exit program 
@@ -299,7 +298,6 @@ def inputBuilder( directories, options, keep_going, save_intermed ):
             cw.dsp(botSpecs, entries, keep_going)
 
         os.chdir(workDir)
-
 
 
 
