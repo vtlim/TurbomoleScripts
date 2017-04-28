@@ -185,8 +185,6 @@ def inputBuilder( directories, options, keep_going, save_intermed ):
                                      'Continue? [y/n]\n')
 
 
-
-
     #Iterate through all argument directory paths. If 
     #no directories were supplied, do this for the working
     #directory. 
@@ -273,24 +271,21 @@ def inputBuilder( directories, options, keep_going, save_intermed ):
 
         p=sp.Popen('define < def.input > def.out',shell=True)
         p.wait()
-
+        
         if not save_intermed:
             os.remove('def.input')
             os.remove('def.out')
-        if any("cosmo" in s for s in entries):
-            cosInp=open('cosmoprep.input','w')
-            cw.cosmo(botSpecs, entries, cosInp)
-            cosInp.close()
+
+            
+        if any("$cosmo" in s for s in entries):
+            cw.cosmo(botSpecs, entries)
             p=sp.Popen('cosmoprep < cosmoprep.input > cosmoprep.out',shell=True)
             p.wait()
+            
+            if not save_intermed:
+                os.remove('cosmoprep.input')
+                os.remove('cosmoprep.out')
 
-
-        #Place setup files no longer needed in setup dir
-        if not os.path.exists('setup'):
-            os.makedirs('setup')
-        for i in ['input.xyz','options','cosmoprep.input','cosmoprep.out','def.input','def.out']:
-            try: os.rename(i,'setup/'+i)
-            except OSError: pass
 
         #Check if define finished, if the user did not choose
         #to ignore failed set ups, exit program 
@@ -303,7 +298,6 @@ def inputBuilder( directories, options, keep_going, save_intermed ):
             cw.dsp(botSpecs, entries, keep_going)
 
         os.chdir(workDir)
-
 
 
 
