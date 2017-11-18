@@ -47,7 +47,7 @@ def getLine(opts, key):
 
     
    if opts:
-       line=thisIter.next()
+       line=next(thisIter)
        noEnd=True
    else:
        noEnd=False
@@ -56,19 +56,19 @@ def getLine(opts, key):
        #Find the section specified by key
        if line.split()[0] == key:
            target=line.split(key)[1]
-           line=thisIter.next()
+           line=next(thisIter)
 
            #Get continued lines
            while '$' not in line:
                target=target.strip('\n')
                target=target+' '+line
-               line=thisIter.next()
+               line=next(thisIter)
  
        #Push through until file end or key reached. 
        if line.split()[0] == '$end':
            noEnd = False
        elif line.split()[0] != key :
-           line=thisIter.next()
+           line=next(thisIter)
 
    return target
 

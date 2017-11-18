@@ -127,17 +127,17 @@ def optsParser( opts ):
             '$rirpa', '$scf', '$dsp', '$fix', '$cosmo' ] 
     entries=[]
 
-    line=opts.next()
+    line=opts.readline()
     noEnd=True
     while noEnd:
         #Add lines to array until new section is reached. 
         if line.split()[0] in allowedKeys:
             line = escapeChars( line )
             entries.append(line)
-            line=opts.next()
+            line=opts.readline()
             while '$' not in line:
                 entries.append(line)
-                line = opts.next()
+                line = opts.readline()
 
         #Push through until file end
         if line.split()[0] == '$end':
@@ -145,7 +145,7 @@ def optsParser( opts ):
             noEnd = False
         elif line.split()[0] not in allowedKeys:
             print('Warning: ',line.split()[0],' is not an allowed key.')
-            line=opts.next()
+            line=opts.readline()
 
 
     return entries
