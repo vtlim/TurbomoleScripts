@@ -193,64 +193,34 @@ def assignSym(botSpecs, entries, defInp):
             else:
                defInp.write('sy '+group+'\n')
 
-#fix() handles specification of frozen internal coordinates.
-#type takes values: stre,invr,bend,outp,tors,linc,linp
-#See section 4.1.2 of the Turbomole manual to learn how atomic 
-#indices should be specified for each type. 
+#fix() specifies part of geometry to restrain
+#within internal coordinate sub-menu.
+#Only type=tors currently supported.
 #
-#comp and ring type specifications not currently supported
+#Default: $fix omitted - restraint not used
 #
-#Default: $fix used/omitted - restraint not used
-#
-#KeyFormat: $fix [type]=[1-4,6]
+#KeyFormat: $fix type=[label] atoms=[label1,label2,label3,label4]
 def fix(botSpecs, entries, defInp):
-   typeDict = {'stre' : 2,
-               'invr' : 2,
-               'bend' : 3,
-               'outp' : 4,
-               'tors' : 4,
-               'linc' : 4,
-               'linp' : 4 }
    key='$fix'
 
    fix=getLine(entries, key)
    fixBot=getLine(botSpecs, key)
 
    if fixBot:
-      if fix:
-         print 'Warning: frozen coordinates specified in top' \
-             + ' level options file will be overridden'
       fix = fixBot
 
    if fix:
       defInp.write('idef\n')
-      for f in fix.split():
-         ftype, atoms = f.split('=')
+      if 'type=' in fix:
+         ftype=fix.split('type=')[1]
+         ftype=ftype.split()[0]
          defInp.write('f '+ftype)
-         
+      if 'atoms=' in fix:
+         atoms=fix.split('atoms=')[1]
          atoms=atoms.split(',')
-         count = 0
          for a in atoms:
-            if '-' in a:
-               rnge = range(int(a.split('-')[0]),int(a.split('-')[1]+1))
-               a = ''
-               for at in rnge:
-                  a += str(at) + ' '
-                  count += 1
-               count -= 1
-               
-            count += 1
-            defInp.write(' ' + a)
-         defInp.write('\n')
-         
-         try: 
-            if typeDict[ftype] != count:
-               print 'Error: wrong number of indices specified in - '+f
-               return
-         except KeyError:
-            print 'Error: '+ftype+' is not an allowed constraint type'
-            return
-         
+             defInp.write(' ' + a)
+      
       defInp.write('\n\n\n\n')
 
 
@@ -318,7 +288,7 @@ def assignFrags(botSpecs, entries, defInp):
             elif len(rnge) == 1:
                defInp.write(rnge[0]+'\n'+rnge[0]+'\n1\n')
             else:
-               print 'Error: invalid entry in $frag'
+               print('Error: invalid entry in $frag')
                sys.exit()
       if 'frag2=' in frag:
          frag2=frag.split('frag2=')[1]
@@ -333,7 +303,7 @@ def assignFrags(botSpecs, entries, defInp):
             elif len(rnge) == 1:
                defInp.write(rnge[0]+'\n'+rnge[0]+'\n2\n')
             else:
-               print 'Error: invalid entry in $frag'
+               print('Error: invalid entry in $frag')
                sys.exit()
       if 'frag3=' in frag:
          frag3=frag.split('frag3=')[1]
@@ -348,7 +318,7 @@ def assignFrags(botSpecs, entries, defInp):
             elif len(rnge) == 1:
                defInp.write(rnge[0]+'\n'+rnge[0]+'\n3\n')
             else:
-               print 'Error: invalid entry in $frag'
+               print('Error: invalid entry in $frag')
                sys.exit()
 
 #      if 'sym=' in frag:
@@ -412,7 +382,7 @@ def defBasis(botSpecs, entries, defInp):
                 entry[1] = getEscapeChars(entry[1])
                 defInp.write(entry[1]+' '+entry[0]+'\n')
             else:
-                print 'Error: empty basis set assignment for '+entry[0]
+                print('Error: empty basis set assignment for '+entry[0])
                 sys.exit()
          else:
             entry = getEscapeChars(entry)
@@ -482,7 +452,7 @@ def eht(botSpecs, entries, defInp):
          if 'global' in [item for sub in eht for item in sub]:
             for entry in eht:
                if len(entry) != 2:
-                  print 'Error: improper eht option supplied'
+                  print('Error: improper eht option supplied')
                   sys.exit()
                if entry[0] == 'global':
                   defInp.write('y\n'+entry[1]+'\n')
@@ -494,7 +464,7 @@ def eht(botSpecs, entries, defInp):
          if 'modWH' in [item for item in sub for sub in eht]:
             for entry in eht:
                if len(entry) != 2:
-                  print 'Error: improper eht option supplied'
+                  print('Error: improper eht option supplied')
                   sys.exit()
                if entry[0] == 'modWH' and entry[1] == 'on':
                   defInp.write('y\n')
@@ -507,7 +477,7 @@ def eht(botSpecs, entries, defInp):
          #range. It's assumed these are atomic indices. 
          for entry in eht:
             if len(entry) != 2:
-               print 'Error: improper eht option supplied'
+               print('Error: improper eht option supplied')
                sys.exit()
             if ',' in entry[0]:
                modAtomEht=True
@@ -523,6 +493,7 @@ def eht(botSpecs, entries, defInp):
    #Will either skip the Hueckel modifying section or exit
    #the atom pair section depending on choices. 
    defInp.write('\n')
+
 
 
 
@@ -820,8 +791,8 @@ def scf(botSpecs, entries, defInp):
 ################################################################################
 
 
-#cosmo() writes cosmoprep input, currently only
-#epsilon and refractive index may be specified. 
+#cosmo() writes input for cosmoprep, allowing user to specify
+#epsilon and refractive index.
 #
 #Default: '$cosmo' omitted - don't use cosmo
 #          $cosmo used     - epsilon=infinity
@@ -836,7 +807,7 @@ def scf(botSpecs, entries, defInp):
 #                          - refind= 1.3
 #
 #KeyFormat: $cosmo epsilon=[epsilon] refind=[refind]
-def cosmo(botSpecs, entries):
+def cosmo(botSpecs, entries, defInp):
    key='$cosmo'
 
    cosmo=getLine(entries, key)
@@ -846,18 +817,18 @@ def cosmo(botSpecs, entries):
       cosmo = cosmoBot
 
    if cosmo:
-      cosInp = open('cosmoprep.input','w')
       if 'epsilon=' in cosmo:
          eps=cosmo.split('epsilon=')[1]
          eps=eps.split()[0]
-         cosInp.write(eps+'\n')
+         defInp.write(eps)
       if 'refind=' in cosmo:
          rind=cosmo.split('refind=')[1]
          rind=rind.split[0]
-         cosInp.write(rind+'\n')
-         
-      cosInp.write('\n'*11)
-      cosInp.write('r all o\n*\n\n\n')
+         defInp.write(rind)
+      for i in range(11):
+         defInp.write('\n')
+
+      defInp.write('r all o\n*\n\n\n')
 
 
 ################################################################################
@@ -894,10 +865,10 @@ def dsp(botSpecs, entries, keep_going):
                   + "\\n$end/' control",shell=True)
          p.wait()
       except KeyError:
-         print 'Error: ' + dsp + ' is not an allowed entry for $dsp.'
-         print 'Allowed entries and the keyword they add to control are:'
+         print('Error: ' + dsp + ' is not an allowed entry for $dsp.')
+         print('Allowed entries and the keyword they add to control are:')
          for k in disp_dict.keys():
-            print k + ' adds ' + disp_dict[k]
+            print(k + ' adds ' + disp_dict[k])
 
          if not keep_going:
             sys.exit()
